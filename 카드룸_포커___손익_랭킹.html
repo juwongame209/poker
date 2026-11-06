@@ -1,0 +1,484 @@
+<!doctype html><html lang="en"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>카드룸 포커 · 손익 랭킹</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위쪽 상대 3명, 가운데 팟과 공유 카드, 아래쪽 내 자리와 행동 버튼. 로그는 맨 아래.
+   어두운 카드룸 한 가지 룩으로 고정 */
+:root{
+  --bg:#0d1512; --ink:#ece7da; --muted:#9db0a6; --line:#2b4238;
+  --felt:#15392e; --felt2:#0e2a21; --rail:#3a2a1a; --seat:#0f2820;
+  --brass:#dcb45c; --on-brass:#1b1405; --card:#f7f4ec; --card-ink:#1a1a1a; --card-red:#c22d2d;
+  --back:#27408b; --ok:#6fd49a; --bad:#ff8a7a; --btn:#1c3329;
+  --display:"Black Han Sans","Noto Sans KR",sans-serif; --body:"Noto Sans KR",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45;
+  padding-block:18px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,38px);margin:0;line-height:1.1;letter-spacing:.5px}
+.sub{color:var(--muted);font-size:12px}
+.hd-r{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.net{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums}
+.pos{color:var(--ok)}.neg{color:var(--bad)}
+.notice{border:1px dashed var(--line);padding:8px 12px;font-size:12px;color:var(--muted)}
+button{font:inherit;color:var(--ink);background:var(--btn);border:1px solid var(--line);padding:8px 12px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--brass)}
+button:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+.menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.mode{text-align:left;padding:18px;display:flex;flex-direction:column;gap:8px;background:var(--felt2);border:2px solid var(--line)}
+.mode:hover{border-color:var(--brass)}
+.mode b{font-family:var(--display);font-weight:400;font-size:26px}
+.mode span{color:var(--muted);font-size:13px}
+.mode ul{margin:0;padding-left:18px;color:var(--muted);font-size:12px}
+.table{background:radial-gradient(ellipse at 50% 45%,var(--felt) 0,var(--felt2) 100%);border:6px solid var(--rail);border-radius:26px;padding:14px;display:flex;flex-direction:column;gap:14px}
+.bots{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.seat{background:var(--seat);border:1px solid var(--line);padding:8px 10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.seat.turn{border-color:var(--brass);box-shadow:0 0 0 2px var(--brass)}
+.seat.out{opacity:.5}
+.seat.won{border-color:var(--ok);box-shadow:0 0 0 2px var(--ok)}
+.sh{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.sh b{font-weight:700}
+.chips{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px}
+.st{display:flex;gap:6px;flex-wrap:wrap;min-height:20px;font-size:11px;align-items:center}
+.pill{border:1px solid currentColor;padding:0 6px;color:var(--muted)}
+.pill.d{color:var(--brass)}.pill.b{color:var(--ink)}
+.cards{display:flex;gap:4px;flex-wrap:wrap;min-height:44px}
+.card{width:30px;height:42px;background:var(--card);color:var(--card-ink);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:12px;line-height:1.05;font-family:var(--mono);border:1px solid #0006}
+.card.red{color:var(--card-red)}
+.card.back{background:repeating-linear-gradient(45deg,var(--back) 0 4px,#1d2f6b 4px 8px);border-color:#9fb2ee66}
+.card.dn{outline:2px dashed #0007;outline-offset:-4px}
+.card.empty{background:transparent;border:1px dashed var(--line)}
+.me .card,.board .card{width:clamp(34px,9.5vw,50px);height:clamp(48px,13vw,70px);font-size:clamp(13px,3.4vw,18px)}
+.mid{display:flex;flex-direction:column;align-items:center;gap:8px}
+.pot{font-family:var(--mono);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums;color:var(--brass)}
+.board{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.msg{min-height:22px;text-align:center;font-weight:700}
+.hand{font-size:12px;color:var(--brass)}
+.panel{background:var(--seat);border:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:10px}
+.acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:480px){.acts{grid-template-columns:minmax(0,1fr)}}
+.acts button{padding:12px 8px;font-weight:700}
+.acts .raise{background:var(--brass);color:var(--on-brass);border-color:var(--brass)}
+.rz{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rz input[type=range]{flex:1 1 160px;min-width:0;accent-color:var(--brass)}
+.rz input[type=number]{width:110px;font:inherit;font-family:var(--mono);padding:6px;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.rz .q{display:flex;gap:6px;flex-wrap:wrap}
+.rz .q button{padding:4px 8px;font-size:12px}
+.log{border:1px solid var(--line);padding:8px 12px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:2px;font-family:var(--mono)}
+.log div:first-child{color:var(--ink)}
+.big{font-size:15px;padding:12px 16px;background:var(--brass);color:var(--on-brass);border-color:var(--brass);font-weight:700}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rank{display:flex;flex-direction:column;gap:14px}
+.rank h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{background:var(--seat);border:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stat span{color:var(--muted);font-size:12px}.stat b{font-family:var(--mono);font-size:18px;font-variant-numeric:tabular-nums}
+.nick input{font:inherit;padding:8px;background:var(--bg);color:var(--ink);border:1px solid var(--line);width:180px;max-width:100%}
+.tw{overflow-x:auto}
+table.lb{width:100%;border-collapse:collapse;font-size:13px}
+.lb th,.lb td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.lb th:nth-child(2),.lb td:nth-child(2){text-align:left;width:100%}
+.lb th{color:var(--muted);font-weight:500;font-size:12px}
+.lb td{font-family:var(--mono);font-variant-numeric:tabular-nums}.lb td:nth-child(2){font-family:var(--body)}
+.lb tr.me td{background:#dcb45c22;color:var(--brass)}
+.lb .top1{color:var(--brass);font-weight:700}
+.lang{font:inherit;color:var(--ink);background:var(--btn);border:1px solid var(--line);padding:8px 6px;max-width:130px}
+</style>
+
+<div class="app">
+  <header>
+    <div>
+      <h1 id="ti"></h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="hd-r">
+      <select class="lang" id="lang" aria-label="Language"></select>
+      <span class="sub"><span id="nl"></span> <span class="net" id="net">0P</span></span>
+      <button id="rk"></button>
+      <button id="chg" hidden></button>
+    </div>
+  </header>
+  <div class="notice" id="nt"></div>
+
+  <div class="menu" id="menu"></div>
+
+  <main id="game" hidden>
+    <div class="table">
+      <div class="bots" id="bots"></div>
+      <div class="mid" id="mid"></div>
+      <div id="me"></div>
+    </div>
+    <div class="panel" id="panel" style="margin-top:14px"></div>
+    <div class="log" id="log" style="margin-top:14px"></div>
+  </main>
+  <section class="rank" id="rank" hidden></section>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const SU=['♠','♥','♦','♣'],RED=[0,1,1,0];
+const rk=c=>(c>>2)+2,su=c=>c&3;
+const RL=r=>r==14?'A':r==13?'K':r==12?'Q':r==11?'J':String(r);
+/* ---------- 다국어 (언어 추가: T에 코드 블록 + LN에 이름만 넣으면 됩니다. 빠진 키는 영어로 대체) ---------- */
+const LK='cardroom_lang';
+const T={
+ko:{ti:'카드룸 포커',rh:'손익 랭킹',pick:'게임을 고르세요',net:'누적 손익',rank:'🏆 랭킹',back:'← 돌아가기',chg:'게임 바꾸기',
+notice:'가상 포인트로만 진행하는 게임입니다. 실제 돈은 오가지 않습니다. 상대 3명은 컴퓨터이고, 칩이 바닥나면 10,000P로 자동 충전됩니다(충전금은 손익에 포함되지 않습니다). 랭킹은 모든 핸드의 누적 손익 순위입니다.',
+tH:'텍사스 홀덤',dH:'내 카드 2장과 공유 카드 5장 중 가장 좋은 5장으로 겨룹니다.',aH:'블라인드 100 / 200, 노리밋',bH:'프리플랍, 플랍, 턴, 리버 4번 베팅',cH:'폴드, 체크/콜, 레이즈, 올인',
+tS:'세븐카드',dS:'카드 7장을 받아 가장 좋은 5장으로 겨룹니다. 상대의 오픈 카드를 보고 읽습니다.',aS:'앤티 100, 베팅 단위 200, 라운드당 3회까지',bS:'처음 3장 중 1장, 이후 오픈 카드를 한 장씩, 마지막 7번째는 비공개',cS:'오픈 카드가 가장 높은 사람이 먼저 베팅',
+subH:'텍사스 홀덤 · 블라인드 100/200',subS:'세븐카드 · 앤티 100 · 베팅 단위 200',dealer:'딜러',fold:'폴드',allin:'올인',bet:'베팅 {0}',think:'생각 중…',cur:'현재 {0}',pot:'팟 {0}',brd:'공유 카드',rnd:'{0}번째 카드 라운드 · 오픈 카드는 모두에게 보입니다',cb:'뒷면',
+next:'다음 핸드',chips:'보유 {0}',refillNext:' · 다음 핸드에서 자동 충전',folded:'폴드했습니다. 남은 진행을 지켜보세요.',allinW:'올인했습니다. 결과를 기다리세요.',turn:'{0}님 차례입니다.',
+check:'체크',call:'콜 {0}',allinP:' (올인)',raiseB:'베팅',raiseR:'레이즈',noRaise:'레이즈 불가',rAmt:'레이즈 금액',rIn:'레이즈 금액 입력',min:'최소',half:'½ 팟',potB:'팟',allB:'올인',
+refill:'칩이 바닥나 10,000P를 충전했습니다.',h1log:'제 {0}핸드 · {1} 스몰 {2}, {3} 빅 {4}',h2log:'제 {0}핸드 · 앤티 {1}씩',flop:'플랍 공개',trn:'턴 공개',rvr:'리버 공개',cardN:'{0}번째 카드',
+lFold:'{0} 폴드',lCheck:'{0} 체크',lCall:'{0} 콜 {1}',lBet:'{0} 베팅 {1}',lRaise:'{0} 레이즈 {1}',winF:'{0} 승리 · {1} 획득 (모두 폴드)',sd:'쇼다운 · ',
+h:'하이카드|원페어|투페어|트리플|스트레이트|플러시|풀하우스|포카드|스트레이트 플러시',roy:'로열 스트레이트 플러시',
+myR:'내 순위',pos:'{0}위',hnd:'플레이 핸드',wr:'승률',bst:'최고 수익 핸드',nick:'닉네임',nph:'랭킹에 표시될 이름',save:'저장',thR:'순위',thN:'닉네임',thP:'누적 손익',thH:'핸드',thW:'승률',meS:' (나)',
+empty:'아직 기록이 없습니다. 한 핸드를 끝내면 순위에 오릅니다.',nLive:'모든 플레이어의 기록이 실시간으로 합산됩니다. 상위 50명까지 표시됩니다.',nLoc:'공유 랭킹에 연결되지 않아 이 기기의 내 기록만 표시됩니다.',nLoad:'랭킹을 불러오는 중…',anon:'익명',
+p0:'나',p1:'민준',p2:'서연',p3:'도윤',g1:'공격적',g2:'신중함',g3:'변칙적'},
+en:{ti:'Card Room Poker',rh:'Profit Ranking',pick:'Choose a game',net:'Net P/L',rank:'🏆 Ranking',back:'← Back',chg:'Change game',
+notice:'Play-money game only. No real money changes hands. The 3 opponents are computers, and when your chips run out you are refilled with 10,000P automatically (refills are not counted in your P/L). The ranking lists everyone by cumulative P/L over all hands.',
+tH:'Texas Hold’em',dH:'Make the best 5-card hand from your 2 cards and the 5 community cards.',aH:'Blinds 100 / 200, no-limit',bH:'4 betting rounds: preflop, flop, turn, river',cH:'Fold, check/call, raise, all-in',
+tS:'Seven-Card Stud',dS:'Get 7 cards and play the best 5. Read your opponents’ open cards.',aS:'Ante 100, bet unit 200, up to 3 raises per round',bS:'Of the first 3 cards 1 is open, then one open card per round; the 7th is hidden',cS:'The highest open card bets first',
+subH:'Texas Hold’em · Blinds 100/200',subS:'Seven-Card Stud · Ante 100 · Bet unit 200',dealer:'Dealer',fold:'Fold',allin:'All-in',bet:'Bet {0}',think:'Thinking…',cur:'Now: {0}',pot:'Pot {0}',brd:'Community cards',rnd:'Card {0} round · open cards are visible to all',cb:'Card back',
+next:'Next hand',chips:'Chips {0}',refillNext:' · auto refill next hand',folded:'You folded. Watch the rest of the hand.',allinW:'You are all-in. Wait for the result.',turn:'{0}’s turn.',
+check:'Check',call:'Call {0}',allinP:' (all-in)',raiseB:'Bet',raiseR:'Raise',noRaise:'Cannot raise',rAmt:'Raise amount',rIn:'Enter raise amount',min:'Min',half:'½ Pot',potB:'Pot',allB:'All-in',
+refill:'You ran out of chips and were refilled with 10,000P.',h1log:'Hand {0} · {1} small blind {2}, {3} big blind {4}',h2log:'Hand {0} · ante {1} each',flop:'Flop dealt',trn:'Turn dealt',rvr:'River dealt',cardN:'Card {0}',
+lFold:'{0} folds',lCheck:'{0} checks',lCall:'{0} calls {1}',lBet:'{0} bets {1}',lRaise:'{0} raises to {1}',winF:'{0} wins · {1} (everyone folded)',sd:'Showdown · ',
+h:'High card|One pair|Two pair|Three of a kind|Straight|Flush|Full house|Four of a kind|Straight flush',roy:'Royal flush',
+myR:'Your rank',pos:'#{0}',hnd:'Hands played',wr:'Win rate',bst:'Best winning hand',nick:'Nickname',nph:'Name shown in ranking',save:'Save',thR:'Rank',thN:'Nickname',thP:'Net P/L',thH:'Hands',thW:'Win %',meS:' (me)',
+empty:'No records yet. Finish a hand to join the ranking.',nLive:'Everyone’s results are combined in real time. Top 50 shown.',nLoc:'Not connected to the shared ranking, so only your records on this device are shown.',nLoad:'Loading ranking…',anon:'Anonymous',
+p0:'You',p1:'Alex',p2:'Mia',p3:'Leo',g1:'Aggressive',g2:'Cautious',g3:'Unpredictable'},
+ja:{ti:'カードルーム ポーカー',rh:'損益ランキング',pick:'ゲームを選んでください',net:'累計損益',rank:'🏆 ランキング',back:'← 戻る',chg:'ゲーム変更',
+notice:'仮想ポイントのみで遊ぶゲームです。実際のお金のやり取りはありません。相手3人はコンピューターで、チップが尽きると10,000Pが自動で補充されます(補充分は損益に含まれません)。ランキングは全ハンドの累計損益順です。',
+tH:'テキサス・ホールデム',dH:'手札2枚と共有カード5枚から最も強い5枚で勝負します。',aH:'ブラインド 100 / 200、ノーリミット',bH:'プリフロップ・フロップ・ターン・リバーの4回ベット',cH:'フォールド、チェック/コール、レイズ、オールイン',
+tS:'セブンカード・スタッド',dS:'7枚を受け取り、最も強い5枚で勝負。相手のオープンカードを読みます。',aS:'アンテ 100、ベット単位 200、1ラウンド最大3回',bS:'最初の3枚のうち1枚と、以降1枚ずつ公開。7枚目は非公開',cS:'オープンカードが最も強い人が先にベット',
+subH:'テキサス・ホールデム · ブラインド 100/200',subS:'セブンカード · アンテ 100 · ベット単位 200',dealer:'ディーラー',fold:'フォールド',allin:'オールイン',bet:'ベット {0}',think:'考え中…',cur:'現在 {0}',pot:'ポット {0}',brd:'共有カード',rnd:'{0}枚目のカードラウンド · オープンカードは全員に見えます',cb:'裏面',
+next:'次のハンド',chips:'所持 {0}',refillNext:' · 次のハンドで自動補充',folded:'フォールドしました。残りの進行をご覧ください。',allinW:'オールインしました。結果をお待ちください。',turn:'{0}の番です。',
+check:'チェック',call:'コール {0}',allinP:'(オールイン)',raiseB:'ベット',raiseR:'レイズ',noRaise:'レイズ不可',rAmt:'レイズ額',rIn:'レイズ額を入力',min:'最小',half:'½ ポット',potB:'ポット',allB:'オールイン',
+refill:'チップが尽きたため10,000Pを補充しました。',h1log:'第{0}ハンド · {1}スモール {2}、{3}ビッグ {4}',h2log:'第{0}ハンド · アンテ 各{1}',flop:'フロップ公開',trn:'ターン公開',rvr:'リバー公開',cardN:'{0}枚目のカード',
+lFold:'{0} フォールド',lCheck:'{0} チェック',lCall:'{0} コール {1}',lBet:'{0} ベット {1}',lRaise:'{0} レイズ {1}',winF:'{0} 勝利 · {1} 獲得(全員フォールド)',sd:'ショーダウン · ',
+h:'ハイカード|ワンペア|ツーペア|スリーカード|ストレート|フラッシュ|フルハウス|フォーカード|ストレートフラッシュ',roy:'ロイヤルストレートフラッシュ',
+myR:'自分の順位',pos:'{0}位',hnd:'プレイしたハンド',wr:'勝率',bst:'最高獲得ハンド',nick:'ニックネーム',nph:'ランキングに表示される名前',save:'保存',thR:'順位',thN:'ニックネーム',thP:'累計損益',thH:'ハンド',thW:'勝率',meS:'(自分)',
+empty:'まだ記録がありません。1ハンド終えると順位に載ります。',nLive:'全プレイヤーの記録がリアルタイムで集計されます。上位50人まで表示。',nLoc:'共有ランキングに接続できないため、この端末の記録のみ表示しています。',nLoad:'ランキングを読み込み中…',anon:'匿名',
+p0:'自分',p1:'ハルト',p2:'ユナ',p3:'ソウタ',g1:'攻撃的',g2:'慎重',g3:'変則的'},
+zh:{ti:'牌室扑克',rh:'盈亏排行榜',pick:'请选择游戏',net:'累计盈亏',rank:'🏆 排行榜',back:'← 返回',chg:'更换游戏',
+notice:'本游戏仅使用虚拟积分,不涉及真实金钱。3位对手由电脑控制,筹码用完后会自动补充10,000P(补充金额不计入盈亏)。排行榜按所有牌局的累计盈亏排名。',
+tH:'德州扑克',dH:'用手牌2张和5张公共牌组成最大的5张牌比拼。',aH:'盲注 100 / 200,无限注',bH:'翻牌前、翻牌、转牌、河牌共4轮下注',cH:'弃牌、过牌/跟注、加注、全押',
+tS:'七张牌梭哈',dS:'拿到7张牌,以最大的5张牌比拼。观察对手的明牌。',aS:'底注 100,下注单位 200,每轮最多3次加注',bS:'前3张中亮1张,之后每轮亮一张,第7张为暗牌',cS:'明牌最大的玩家先下注',
+subH:'德州扑克 · 盲注 100/200',subS:'七张牌 · 底注 100 · 下注单位 200',dealer:'庄家',fold:'弃牌',allin:'全押',bet:'下注 {0}',think:'思考中…',cur:'当前 {0}',pot:'底池 {0}',brd:'公共牌',rnd:'第{0}张牌回合 · 明牌所有人可见',cb:'牌背',
+next:'下一局',chips:'持有 {0}',refillNext:' · 下一局自动补充',folded:'你已弃牌,请观看剩余牌局。',allinW:'你已全押,请等待结果。',turn:'轮到{0}了。',
+check:'过牌',call:'跟注 {0}',allinP:'(全押)',raiseB:'下注',raiseR:'加注',noRaise:'无法加注',rAmt:'加注金额',rIn:'输入加注金额',min:'最小',half:'½ 底池',potB:'底池',allB:'全押',
+refill:'筹码用完,已补充10,000P。',h1log:'第{0}局 · {1}小盲 {2},{3}大盲 {4}',h2log:'第{0}局 · 每人底注 {1}',flop:'翻牌',trn:'转牌',rvr:'河牌',cardN:'第{0}张牌',
+lFold:'{0} 弃牌',lCheck:'{0} 过牌',lCall:'{0} 跟注 {1}',lBet:'{0} 下注 {1}',lRaise:'{0} 加注到 {1}',winF:'{0} 获胜 · 赢得 {1}(其他人全部弃牌)',sd:'摊牌 · ',
+h:'高牌|一对|两对|三条|顺子|同花|葫芦|四条|同花顺',roy:'皇家同花顺',
+myR:'我的排名',pos:'第{0}名',hnd:'已玩牌局',wr:'胜率',bst:'单局最高收益',nick:'昵称',nph:'排行榜上显示的名字',save:'保存',thR:'排名',thN:'昵称',thP:'累计盈亏',thH:'牌局',thW:'胜率',meS:'(我)',
+empty:'暂无记录。完成一局后即可上榜。',nLive:'所有玩家的记录实时汇总,最多显示前50名。',nLoc:'未连接到共享排行榜,仅显示本设备上的记录。',nLoad:'正在加载排行榜…',anon:'匿名',
+p0:'我',p1:'子轩',p2:'雨涵',p3:'浩然',g1:'激进',g2:'谨慎',g3:'多变'},
+es:{ti:'Póker de Sala',rh:'Ranking de Ganancias',pick:'Elige un juego',net:'Balance total',rank:'🏆 Ranking',back:'← Volver',chg:'Cambiar juego',
+notice:'Juego solo con puntos virtuales; no se mueve dinero real. Los 3 rivales son la computadora y, si te quedas sin fichas, se recargan 10.000P automáticamente (la recarga no cuenta en tu balance). El ranking ordena por balance acumulado de todas las manos.',
+tH:'Texas Hold’em',dH:'Forma la mejor mano de 5 cartas con tus 2 cartas y las 5 comunitarias.',aH:'Ciegas 100 / 200, sin límite',bH:'4 rondas de apuestas: preflop, flop, turn y river',cH:'Retirarse, pasar/igualar, subir, all-in',
+tS:'Seven-Card Stud',dS:'Recibes 7 cartas y juegas la mejor mano de 5. Lee las cartas abiertas de los rivales.',aS:'Ante 100, unidad de apuesta 200, hasta 3 subidas por ronda',bS:'De las 3 primeras, 1 abierta; luego una abierta por ronda; la 7.ª va oculta',cS:'Apuesta primero quien tiene la carta abierta más alta',
+subH:'Texas Hold’em · Ciegas 100/200',subS:'Seven-Card Stud · Ante 100 · Unidad 200',dealer:'Dealer',fold:'Retirarse',allin:'All-in',bet:'Apuesta {0}',think:'Pensando…',cur:'Ahora: {0}',pot:'Bote {0}',brd:'Cartas comunitarias',rnd:'Ronda de la carta {0} · las cartas abiertas las ve todo el mundo',cb:'Reverso',
+next:'Siguiente mano',chips:'Fichas {0}',refillNext:' · recarga automática en la próxima mano',folded:'Te retiraste. Mira cómo sigue la mano.',allinW:'Estás all-in. Espera el resultado.',turn:'Turno de {0}.',
+check:'Pasar',call:'Igualar {0}',allinP:' (all-in)',raiseB:'Apostar',raiseR:'Subir',noRaise:'No se puede subir',rAmt:'Importe de la subida',rIn:'Introduce el importe',min:'Mín.',half:'½ bote',potB:'Bote',allB:'All-in',
+refill:'Te quedaste sin fichas; se recargaron 10.000P.',h1log:'Mano {0} · {1} ciega pequeña {2}, {3} ciega grande {4}',h2log:'Mano {0} · ante de {1} cada uno',flop:'Se muestra el flop',trn:'Se muestra el turn',rvr:'Se muestra el river',cardN:'Carta {0}',
+lFold:'{0} se retira',lCheck:'{0} pasa',lCall:'{0} iguala {1}',lBet:'{0} apuesta {1}',lRaise:'{0} sube a {1}',winF:'{0} gana · {1} (todos se retiraron)',sd:'Showdown · ',
+h:'Carta alta|Pareja|Doble pareja|Trío|Escalera|Color|Full|Póker|Escalera de color',roy:'Escalera real',
+myR:'Mi posición',pos:'N.º {0}',hnd:'Manos jugadas',wr:'Victorias',bst:'Mejor mano ganada',nick:'Apodo',nph:'Nombre que se muestra en el ranking',save:'Guardar',thR:'Pos.',thN:'Apodo',thP:'Balance',thH:'Manos',thW:'Victorias',meS:' (yo)',
+empty:'Aún no hay registros. Termina una mano para entrar en el ranking.',nLive:'Los resultados de todos se suman en tiempo real. Se muestran los 50 primeros.',nLoc:'Sin conexión al ranking compartido: solo se muestran tus registros en este dispositivo.',nLoad:'Cargando ranking…',anon:'Anónimo',
+p0:'Yo',p1:'Carlos',p2:'Lucía',p3:'Mateo',g1:'Agresivo',g2:'Prudente',g3:'Impredecible'},
+fr:{ti:'Poker Salle de Jeu',rh:'Classement des gains',pick:'Choisissez un jeu',net:'Bilan total',rank:'🏆 Classement',back:'← Retour',chg:'Changer de jeu',
+notice:'Jeu en points virtuels uniquement ; aucun argent réel n’est échangé. Les 3 adversaires sont des ordinateurs ; si vous n’avez plus de jetons, 10 000P sont rechargés automatiquement (la recharge n’entre pas dans votre bilan). Le classement se fait sur le bilan cumulé de toutes les mains.',
+tH:'Texas Hold’em',dH:'Faites la meilleure main de 5 cartes avec vos 2 cartes et les 5 cartes communes.',aH:'Blindes 100 / 200, no-limit',bH:'4 tours de mise : préflop, flop, turn, river',cH:'Se coucher, check/suivre, relancer, tapis',
+tS:'Seven-Card Stud',dS:'Vous recevez 7 cartes et jouez la meilleure main de 5. Observez les cartes ouvertes des adversaires.',aS:'Ante 100, unité de mise 200, 3 relances max par tour',bS:'Sur les 3 premières, 1 ouverte ; puis une ouverte par tour ; la 7e est cachée',cS:'La carte ouverte la plus haute mise en premier',
+subH:'Texas Hold’em · Blindes 100/200',subS:'Seven-Card Stud · Ante 100 · Unité 200',dealer:'Donneur',fold:'Se coucher',allin:'Tapis',bet:'Mise {0}',think:'Réflexion…',cur:'Actuellement : {0}',pot:'Pot {0}',brd:'Cartes communes',rnd:'Tour de la carte n°{0} · les cartes ouvertes sont visibles de tous',cb:'Dos de carte',
+next:'Main suivante',chips:'Jetons {0}',refillNext:' · recharge automatique à la prochaine main',folded:'Vous vous êtes couché. Suivez la fin de la main.',allinW:'Vous êtes à tapis. Attendez le résultat.',turn:'C’est au tour de {0}.',
+check:'Check',call:'Suivre {0}',allinP:' (tapis)',raiseB:'Miser',raiseR:'Relancer',noRaise:'Relance impossible',rAmt:'Montant de la relance',rIn:'Saisir le montant',min:'Min',half:'½ pot',potB:'Pot',allB:'Tapis',
+refill:'Plus de jetons : 10 000P rechargés.',h1log:'Main {0} · {1} petite blinde {2}, {3} grosse blinde {4}',h2log:'Main {0} · ante de {1} chacun',flop:'Flop dévoilé',trn:'Turn dévoilé',rvr:'River dévoilée',cardN:'Carte n°{0}',
+lFold:'{0} se couche',lCheck:'{0} check',lCall:'{0} suit {1}',lBet:'{0} mise {1}',lRaise:'{0} relance à {1}',winF:'{0} gagne · {1} (tous se sont couchés)',sd:'Abattage · ',
+h:'Carte haute|Paire|Double paire|Brelan|Quinte|Couleur|Full|Carré|Quinte flush',roy:'Quinte flush royale',
+myR:'Mon rang',pos:'{0}e',hnd:'Mains jouées',wr:'Taux de victoire',bst:'Meilleure main gagnée',nick:'Pseudo',nph:'Nom affiché dans le classement',save:'Enregistrer',thR:'Rang',thN:'Pseudo',thP:'Bilan',thH:'Mains',thW:'Victoires',meS:' (moi)',
+empty:'Aucun résultat pour l’instant. Terminez une main pour entrer au classement.',nLive:'Les résultats de tous sont cumulés en temps réel. Top 50 affiché.',nLoc:'Classement partagé indisponible : seuls vos résultats sur cet appareil sont affichés.',nLoad:'Chargement du classement…',anon:'Anonyme',
+p0:'Moi',p1:'Louis',p2:'Camille',p3:'Hugo',g1:'Agressif',g2:'Prudent',g3:'Imprévisible'}
+};
+const LN={ko:'한국어',en:'English',ja:'日本語',zh:'中文',es:'Español',fr:'Français'};
+let L='en';try{L=localStorage.getItem(LK)||''}catch(e){}
+if(!T[L]){const n=(navigator.language||'en').toLowerCase().slice(0,2);L=T[n]?n:'en'}
+const t=(k,...a)=>{let s=T[L][k]??T.en[k]??k;a.forEach((v,i)=>{s=s.split('{'+i+'}').join(v)});return s};
+const P0=10000,BB=200,SB=100,ANTE=100,UNIT=200;
+const fmt=n=>Math.round(n).toLocaleString(L)+'P';
+
+/* ---------- 족보 계산 ---------- */
+function straightHi(rs){const s=new Set(rs);if(s.has(14))s.add(1);for(let h=14;h>=5;h--){let ok=true;for(let k=0;k<5;k++)if(!s.has(h-k)){ok=false;break}if(ok)return h}return 0}
+const mk=(cat,a)=>{let s=cat;for(let i=0;i<5;i++)s=s*15+(a[i]||0);return{score:s,cat,hi:a[0]}};
+function evalH(cs){
+  const rc=Array(15).fill(0),sc=[[],[],[],[]];
+  for(const c of cs){rc[rk(c)]++;sc[su(c)].push(rk(c))}
+  const fs=sc.findIndex(a=>a.length>=5);
+  if(fs>=0){const h=straightHi(sc[fs]);if(h)return mk(8,[h])}
+  const q=[],t=[],p=[],all=[];
+  for(let r=14;r>=2;r--){if(rc[r]>0)all.push(r);if(rc[r]==4)q.push(r);else if(rc[r]==3)t.push(r);else if(rc[r]==2)p.push(r)}
+  const oth=ex=>all.filter(r=>!ex.includes(r));
+  if(q.length)return mk(7,[q[0],oth([q[0]])[0]]);
+  if(t.length&&(t.length>1||p.length))return mk(6,[t[0],Math.max(p[0]||0,t[1]||0)]);
+  if(fs>=0)return mk(5,sc[fs].slice().sort((a,b)=>b-a).slice(0,5));
+  const sh=straightHi(all);if(sh)return mk(4,[sh]);
+  if(t.length)return mk(3,[t[0],...oth([t[0]]).slice(0,2)]);
+  if(p.length>=2)return mk(2,[p[0],p[1],oth([p[0],p[1]])[0]]);
+  if(p.length==1)return mk(1,[p[0],...oth([p[0]]).slice(0,3)]);
+  return mk(0,all.slice(0,5));
+}
+const hname=e=>e.cat==8&&e.hi==14?t('roy'):t('h').split('|')[e.cat];
+
+/* ---------- 랭킹 ---------- */
+const LS='cardroom_profile_v1';
+let S={name:'',net:0,hands:0,wins:0,best:0},DB=null,UID=null,rows=[],rt,sync=false,prev=null;
+try{Object.assign(S,JSON.parse(localStorage.getItem(LS)||'{}'))}catch(e){}
+const saveLocal=()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}};
+const an=n=>(!n||n==='익명')?t('anon'):n;
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function push(now){clearTimeout(rt);const go=async()=>{if(!DB||!UID||!S.hands)return;try{await DB.collection('players').doc(UID).set({name:S.name||'익명',net:S.net,hands:S.hands,wins:S.wins,best:S.best,ts:Date.now()})}catch(e){}};if(now)go();else rt=setTimeout(go,1500)}
+function record(d){S.net+=d;S.hands++;if(d>0){S.wins++;S.best=Math.max(S.best,d)}saveLocal();push();renderRank()}
+const sg=n=>(n>0?'+':'')+fmt(n),cl=n=>n>0?'pos':n<0?'neg':'';
+function renderRank(){
+  const el=$('rank');if(!el||el.hidden)return;
+  const list=rows.filter(r=>r.id!==UID);if(S.hands)list.push({id:UID||'local',name:S.name||'익명',net:S.net,hands:S.hands,wins:S.wins});
+  list.sort((a,b)=>b.net-a.net||b.hands-a.hands);
+  const my=list.findIndex(r=>r.id===(UID||'local')),wr=S.hands?Math.round(S.wins/S.hands*100):0;
+  const body=list.length?list.slice(0,50).map((r,i)=>`<tr class="${r.id===(UID||'local')?'me':''}"><td class="${i==0?'top1':''}">${i==0?'🥇':i==1?'🥈':i==2?'🥉':i+1}</td><td>${esc(an(r.name))}${r.id===(UID||'local')?t('meS'):''}</td><td class="${cl(r.net)}">${sg(r.net)}</td><td>${r.hands||0}</td><td>${r.hands?Math.round((r.wins||0)/r.hands*100):0}%</td></tr>`).join(''):`<tr><td colspan="5" style="text-align:center;color:var(--muted)">${t('empty')}</td></tr>`;
+  el.innerHTML=`<h2>${t('rh')}</h2>
+  <div class="stats"><div class="stat"><span>${t('myR')}</span><b>${my>=0?t('pos',my+1):'-'}</b></div><div class="stat"><span>${t('net')}</span><b class="${cl(S.net)}">${sg(S.net)}</b></div><div class="stat"><span>${t('hnd')}</span><b>${S.hands}</b></div><div class="stat"><span>${t('wr')}</span><b>${wr}%</b></div><div class="stat"><span>${t('bst')}</span><b>${fmt(S.best)}</b></div></div>
+  <div class="row nick"><label for="nick">${t('nick')}</label><input id="nick" maxlength="12" placeholder="${t('nph')}" value="${esc(S.name)}"><button id="nsave">${t('save')}</button></div>
+  <div class="tw"><table class="lb"><thead><tr><th>${t('thR')}</th><th>${t('thN')}</th><th>${t('thP')}</th><th>${t('thH')}</th><th>${t('thW')}</th></tr></thead><tbody>${body}</tbody></table></div>
+  <div class="notice">${DB?t('nLive'):sync?t('nLoc'):t('nLoad')}</div>`;
+}
+function showRank(on){
+  const r=$('rank');
+  if(on){prev={m:$('menu').hidden,g:$('game').hidden};$('menu').hidden=true;$('game').hidden=true;$('chg').hidden=true;r.hidden=false;$('rk').textContent=t('back');renderRank()}
+  else{r.hidden=true;$('menu').hidden=prev?prev.m:false;$('game').hidden=prev?prev.g:true;$('chg').hidden=!G;$('rk').textContent=t('rank')}
+}
+(async()=>{
+  setTimeout(()=>{sync=true;renderRank()},10000);
+  try{
+    if(!window.claude)throw 0;
+    const [d,u]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    if(!d||!u)throw 0;const id=await u.id();if(!id)throw 0;
+    DB=d;UID=id;
+    const me=await d.collection('players').doc(id).get();
+    if(me.exists){const v=me.data();if((v.hands||0)>S.hands){S.net=v.net||0;S.hands=v.hands||0;S.wins=v.wins||0;S.best=v.best||0;if(v.name&&v.name!=='익명'&&!S.name)S.name=v.name;saveLocal()}else push(true)}
+    else if(S.hands)push(true);
+    d.collection('players').orderBy('net','desc').limit(50).onSnapshot(q=>{rows=q.docs.map(x=>({id:x.id,...x.data()}));sync=true;renderRank()},()=>{DB=null;sync=true;renderRank()});
+  }catch(e){sync=true;renderRank()}
+})();
+
+/* ---------- 게임 상태 ---------- */
+let G=null;
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+function mkPlayers(){return[{nk:'p0',human:true},{nk:'p1',tk:'g1',ag:.75,ti:.3},{nk:'p2',tk:'g2',ag:.35,ti:.8},{nk:'p3',tk:'g3',ag:.6,ti:.5}].map(p=>{const o={...p,chips:P0,cards:[],folded:false,allIn:false,bet:0,total:0,acted:false};Object.defineProperty(o,'name',{get(){return t(this.nk)}});Object.defineProperty(o,'tag',{get(){return this.tk?t(this.tk):''}});return o})}
+const can=i=>{const p=G.P[i];return !p.folded&&!p.allIn&&p.chips>0}
+const alive=()=>G.P.filter(p=>!p.folded);
+const net=()=>G.P[0].chips-G.buy*P0;
+const log=m=>{G.log.unshift(m);if(G.log.length>9)G.log.pop()};
+const later=(f,ms)=>{const g=G.gen;setTimeout(()=>{if(G&&G.gen==g)f()},ms)};
+const final=()=>G.mode=='holdem'?3:4;
+
+const setSub=()=>{$('sub').textContent=G?(G.mode=='holdem'?t('subH'):t('subS')):t('pick')};
+function startGame(mode){G={mode,P:mkPlayers(),dealer:-1,gen:(G?G.gen+1:1),buy:1,log:[],over:true,hands:0};$('menu').hidden=true;$('game').hidden=false;$('chg').hidden=false;
+  setSub();newHand()}
+function toMenu(){if(G&&!G.over)record(-G.P[0].total);if(G)G.gen++;G=null;$('menu').hidden=false;$('game').hidden=true;$('chg').hidden=true;setSub();$('net').textContent='0P';$('net').className='net'}
+
+function post(i,amt,asBet){const p=G.P[i],pay=Math.min(amt,p.chips);p.chips-=pay;p.total+=pay;G.pot+=pay;if(asBet)p.bet+=pay;if(p.chips==0)p.allIn=true}
+function newHand(){
+  G.gen++;const P=G.P;G.hands++;
+  P.forEach((p,i)=>{p.cards=[];p.folded=false;p.allIn=false;p.bet=0;p.total=0;p.acted=false;p.won=false;if(p.chips<=0){p.chips=P0;if(i==0){G.buy++;log(t('refill'))}}});
+  G.s0=P[0].chips;G.deck=shuffle([...Array(52).keys()]);G.board=[];G.pot=0;G.street=0;G.over=false;G.reveal=false;G.msg='';G.raises=0;G.dealer=(G.dealer+1)%4;
+  const D=G.dealer;
+  if(G.mode=='holdem'){
+    const sb=(D+1)%4,bb=(D+2)%4;post(sb,SB,true);post(bb,BB,true);
+    P.forEach(p=>{p.cards=[{c:G.deck.pop(),dn:true},{c:G.deck.pop(),dn:true}]});
+    log(t('h1log',G.hands,P[sb].name,SB,P[bb].name,BB));
+    beginBet((D+3)%4,true);
+  }else{
+    P.forEach((p,i)=>post(i,ANTE,false));
+    P.forEach(p=>{p.cards=[{c:G.deck.pop(),dn:true},{c:G.deck.pop(),dn:true},{c:G.deck.pop(),dn:false}]});
+    log(t('h2log',G.hands,ANTE));
+    beginBet(studFirst(),false);
+  }
+}
+function studFirst(){let best=-1,bi=0;G.P.forEach((p,i)=>{if(p.folded)return;const vis=p.cards.filter(x=>!x.dn).map(x=>x.c);const e=evalH(vis);const v=e.score+(Math.max(...vis)+1)/100;if(v>best){best=v;bi=i}});return bi}
+function beginBet(first,keep){
+  G.P.forEach(p=>{if(!keep)p.bet=0;p.acted=false});
+  G.cur=Math.max(...G.P.map(p=>p.bet));G.minRaise=BB;G.raises=keep?1:0;G.toAct=first;loop();
+}
+function roundDone(){const c=G.P.filter((p,i)=>can(i));if(!c.length)return true;if(c.every(p=>p.acted&&p.bet==G.cur))return true;if(c.length==1&&c[0].bet>=G.cur)return true;return false}
+function nextCan(i){for(let k=0;k<4;k++){const j=(i+k)%4;if(can(j))return j}return -1}
+function loop(){
+  if(alive().length==1)return settle(false);
+  if(roundDone())return advance();
+  const i=nextCan(G.toAct);G.toAct=i;render();
+  if(G.P[i].human)return;
+  later(()=>{botAct(i)},850);
+}
+function canRaise(i){const p=G.P[i];if(p.chips<=G.cur-p.bet)return false;if(!G.P.some((q,j)=>j!=i&&can(j)))return false;if(G.mode=='stud'&&G.raises>=3)return false;return true}
+function raiseRange(i){const p=G.P[i],max=p.bet+p.chips;if(G.mode=='stud')return{min:Math.min(max,G.cur+UNIT),max:Math.min(max,G.cur+UNIT)};return{min:Math.min(max,G.cur+G.minRaise),max}}
+function act(i,type,to){
+  const p=G.P[i],toCall=G.cur-p.bet;
+  if(type=='fold'){p.folded=true;log(t('lFold',p.name))}
+  else if(type=='check'){p.acted=true;log(t('lCheck',p.name))}
+  else if(type=='call'){const pay=Math.min(toCall,p.chips);p.chips-=pay;p.bet+=pay;p.total+=pay;G.pot+=pay;if(!p.chips)p.allIn=true;p.acted=true;log(t('lCall',p.name,fmt(pay))+(p.allIn?t('allinP'):''))}
+  else{const r=raiseRange(i);to=Math.max(r.min,Math.min(to,p.bet+p.chips));const pay=to-p.bet;const was=G.cur;
+    p.chips-=pay;p.bet=to;p.total+=pay;G.pot+=pay;if(!p.chips)p.allIn=true;
+    if(to>G.cur){if(G.mode=='holdem')G.minRaise=Math.max(G.minRaise,to-G.cur);G.cur=to;G.P.forEach(q=>{if(q!==p)q.acted=false});G.raises++}
+    p.acted=true;log(t(was==0?'lBet':'lRaise',p.name,fmt(to))+(p.allIn?t('allinP'):''))}
+  G.toAct=(i+1)%4;loop();
+}
+
+function advance(){
+  if(alive().length==1)return settle(false);
+  if(G.street>=final())return settle(true);
+  G.street++;
+  if(G.mode=='holdem'){const n=G.street==1?3:1;for(let k=0;k<n;k++)G.board.push(G.deck.pop());log(t(G.street==1?'flop':G.street==2?'trn':'rvr'))}
+  else{G.P.forEach(p=>{if(!p.folded)p.cards.push({c:G.deck.pop(),dn:G.street==4})});log(t('cardN',G.street+3))}
+  G.P.forEach(p=>{p.bet=0;p.acted=false});G.cur=0;G.raises=0;
+  const ableCount=G.P.filter((p,i)=>can(i)).length;
+  if(ableCount<2){render();later(advance,1000);return}
+  const first=G.mode=='holdem'?nextCan((G.dealer+1)%4):nextCan(studFirst());
+  beginBet(first,false);
+}
+
+function settle(showdown){
+  const P=G.P;G.over=true;
+  if(!showdown){const w=alive()[0];w.chips+=G.pot;w.won=true;G.msg=t('winF',w.name,fmt(G.pot));log(G.msg)}
+  else{
+    G.reveal=true;const sc={};P.forEach((p,i)=>{if(!p.folded)sc[i]=evalH(p.cards.map(x=>x.c).concat(G.board))});
+    const lv=[...new Set(P.map(p=>p.total).filter(x=>x>0))].sort((a,b)=>a-b);let prev=0;const pay=P.map(()=>0);
+    for(const L of lv){let slice=0;P.forEach(p=>{slice+=Math.max(0,Math.min(p.total,L)-Math.min(p.total,prev))});
+      let el=P.map((p,i)=>i).filter(i=>!P[i].folded&&P[i].total>=L);if(!el.length)el=P.map((p,i)=>i).filter(i=>!P[i].folded);
+      const top=Math.max(...el.map(i=>sc[i].score)),ws=el.filter(i=>sc[i].score==top);
+      const sh=Math.floor(slice/ws.length);ws.forEach(i=>pay[i]+=sh);pay[ws[0]]+=slice-sh*ws.length;prev=L}
+    const parts=[];P.forEach((p,i)=>{if(pay[i]>0){p.chips+=pay[i];p.won=true;parts.push(`${p.name} ${hname(sc[i])} ${fmt(pay[i])}`)}});
+    G.msg=t('sd')+parts.join(' / ');log(G.msg);G.sc=sc;
+  }
+  G.pot=0;record(G.P[0].chips-G.s0);render();
+}
+
+/* ---------- 컴퓨터 상대 ---------- */
+function equity(i,n){
+  const me=G.P[i];let known=me.cards.map(x=>x.c).concat(G.board);
+  if(G.mode=='stud')G.P.forEach((q,j)=>{if(j!=i)q.cards.forEach(x=>{if(!x.dn)known.push(x.c)})});
+  const ks=new Set(known),un=[];for(let c=0;c<52;c++)if(!ks.has(c))un.push(c);
+  const opps=G.P.map((q,j)=>j).filter(j=>j!=i&&!G.P[j].folded);
+  const need=G.mode=='holdem'?(5-G.board.length)+2*opps.length:(7-me.cards.length)+opps.reduce((s,j)=>s+7-G.P[j].cards.filter(x=>!x.dn).length,0);
+  let w=0;
+  for(let s=0;s<n;s++){
+    for(let k=0;k<need;k++){const r=k+Math.floor(Math.random()*(un.length-k));[un[k],un[r]]=[un[r],un[k]]}
+    let idx=0,mine,os=[];
+    if(G.mode=='holdem'){const b=G.board.concat(un.slice(idx,idx+5-G.board.length));idx+=5-G.board.length;mine=evalH(me.cards.map(x=>x.c).concat(b)).score;
+      for(const j of opps){os.push(evalH([un[idx],un[idx+1]].concat(b)).score);idx+=2}}
+    else{const m=7-me.cards.length;mine=evalH(known.slice(0,me.cards.length).concat(un.slice(idx,idx+m))).score;idx+=m;
+      for(const j of opps){const v=G.P[j].cards.filter(x=>!x.dn).map(x=>x.c),m2=7-v.length;os.push(evalH(v.concat(un.slice(idx,idx+m2))).score);idx+=m2}}
+    const top=Math.max(...os,-1);if(mine>top)w+=1;else if(mine==top)w+=1/(1+os.filter(x=>x==top).length)}
+  return w/n;
+}
+function botAct(i){
+  const p=G.P[i],toCall=G.cur-p.bet,e=equity(i,G.mode=='holdem'&&G.street==0?220:140),cr=canRaise(i),pot=G.pot;
+  const rr=raiseRange(i);
+  const size=()=>{if(G.mode=='stud')return rr.min;let t=G.cur+Math.max(G.minRaise,Math.round(pot*(0.3+0.5*e*p.ag)/100)*100);t=Math.min(t,p.bet+p.chips);if(e>0.88&&Math.random()<0.5)t=p.bet+p.chips;return t};
+  if(toCall<=0){
+    if(cr&&e>0.5+p.ti*0.12&&Math.random()<0.45+p.ag*0.5)return act(i,'raise',size());
+    if(cr&&e>0.28&&Math.random()<0.06*p.ag*2)return act(i,'raise',rr.min);
+    return act(i,'check');
+  }
+  const po=toCall/(pot+toCall),need=po+0.04+p.ti*0.06+(toCall>=p.chips?0.05:0);
+  if(cr&&e>0.74&&Math.random()<0.35+p.ag*0.55)return act(i,'raise',size());
+  if(e>=need||Math.random()<0.03)return act(i,'call');
+  act(i,'fold');
+}
+
+/* ---------- 화면 ---------- */
+const cardH=(c,down,cls)=>`<div class="card ${RED[su(c)]?'red':''} ${down?'dn':''} ${cls||''}" aria-label="${SU[su(c)]} ${RL(rk(c))}"><span>${RL(rk(c))}</span><span>${SU[su(c)]}</span></div>`;
+const backH=()=>`<div class="card back" aria-label="${t('cb')}"></div>`;
+function seatCards(i){
+  const p=G.P[i],hide=!p.human&&!G.reveal;
+  if(p.folded&&G.mode=='holdem')return `<span class="sub">${t('fold')}</span>`;
+  return p.cards.map(x=>{if(hide&&x.dn)return backH();return cardH(x.c,x.dn&&G.mode=='stud')}).join('');
+}
+function seatHTML(i){
+  const p=G.P[i],isT=!G.over&&G.toAct==i,pills=[];
+  if(G.dealer==i)pills.push(`<span class="pill d">${t('dealer')}</span>`);
+  if(G.mode=='holdem'&&G.hands&&i==(G.dealer+1)%4)pills.push('<span class="pill b">SB</span>');
+  if(G.mode=='holdem'&&i==(G.dealer+2)%4)pills.push('<span class="pill b">BB</span>');
+  if(p.folded)pills.push(`<span class="pill">${t('fold')}</span>`);
+  if(p.allIn)pills.push(`<span class="pill d">${t('allin')}</span>`);
+  if(p.bet>0&&!G.over)pills.push(`<span class="pill b">${t('bet',p.bet.toLocaleString(L))}</span>`);
+  if(isT&&!p.human)pills.push(`<span class="pill d">${t('think')}</span>`);
+  let hand='';
+  if(G.over&&G.reveal&&G.sc&&G.sc[i])hand=`<div class="hand">${hname(G.sc[i])}</div>`;
+  else if(p.human&&!p.folded&&p.cards.length){const e=evalH(p.cards.map(x=>x.c).concat(G.board));hand=`<div class="hand">${t('cur',hname(e))}</div>`}
+  return `<div class="seat ${p.human?'me':''} ${isT?'turn':''} ${p.folded?'out':''} ${G.over&&p.won?'won':''}"><div class="sh"><b>${p.name}${p.tag?` <span class="sub">${p.tag}</span>`:''}</b><span class="chips">${fmt(p.chips)}</span></div><div class="st">${pills.join('')}</div><div class="cards">${seatCards(i)}</div>${hand}</div>`;
+}
+function render(){
+  if(!G)return;
+  $('bots').innerHTML=[1,2,3].map(seatHTML).join('');
+  let mid=`<div class="pot">${t('pot',fmt(G.pot||0))}</div>`;
+  if(G.mode=='holdem'){let b='';for(let k=0;k<5;k++)b+=G.board[k]!=null?cardH(G.board[k]):'<div class="card empty"></div>';mid+=`<div class="board" aria-label="${t('brd')}">${b}</div>`}
+  else mid+=`<div class="sub">${t('rnd',G.street+3)}</div>`;
+  mid+=`<div class="msg" role="status">${G.over?G.msg:''}</div>`;
+  $('mid').innerHTML=mid;
+  $('me').innerHTML=seatHTML(0);
+  const n=net();$('net').textContent=(n>0?'+':'')+fmt(n);$('net').className='net '+(n>0?'pos':n<0?'neg':'');
+  $('log').innerHTML=G.log.map(l=>`<div>${l}</div>`).join('');
+  panel();
+}
+function panel(){
+  const el=$('panel'),p=G.P[0];
+  if(G.over){el.innerHTML=`<div class="row"><button class="big" id="next">${t('next')}</button><span class="sub">${t('chips',fmt(p.chips))}${p.chips<=0?t('refillNext'):''}</span></div>`;return}
+  if(G.toAct!=0||p.folded||!can(0)){el.innerHTML=`<div class="sub">${p.folded?t('folded'):p.allIn?t('allinW'):t('turn',G.P[G.toAct].name)}</div>`;return}
+  const toCall=G.cur-p.bet,cr=canRaise(0),r=raiseRange(0);
+  if(G.raiseTo==null||G.raiseTo<r.min||G.raiseTo>r.max||G.rtHand!=G.hands+':'+G.street+':'+G.cur)G.raiseTo=r.min;G.rtHand=G.hands+':'+G.street+':'+G.cur;
+  const callLbl=toCall<=0?t('check'):t('call',fmt(Math.min(toCall,p.chips)))+(toCall>=p.chips?t('allinP'):'');
+  let rz='';
+  if(cr&&G.mode=='holdem'&&r.max>r.min)rz=`<div class="rz"><input type="range" id="rs" aria-label="${t('rAmt')}" min="${r.min}" max="${r.max}" step="100" value="${G.raiseTo}"><input type="number" id="rn" aria-label="${t('rIn')}" min="${r.min}" max="${r.max}" step="100" value="${G.raiseTo}"><div class="q"><button data-q="min">${t('min')}</button><button data-q="half">${t('half')}</button><button data-q="pot">${t('potB')}</button><button data-q="all">${t('allB')}</button></div></div>`;
+  const rLbl=t(G.cur==0?'raiseB':'raiseR');
+  el.innerHTML=`<div class="acts"><button id="fold">${t('fold')}</button><button id="call">${callLbl}</button><button class="raise" id="raise" ${cr?'':'disabled'}>${cr?(G.mode=='stud'?`${rLbl} ${fmt(r.min)}`:`${rLbl} <span id="rl">${fmt(G.raiseTo)}</span>`+(G.raiseTo>=p.bet+p.chips?t('allinP'):'')):t('noRaise')}</button></div>${rz}`;
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('button');if(!t)return;
+  if(t.dataset.mode)return startGame(t.dataset.mode);
+  if(t.id=='rk')return showRank($('rank').hidden);
+  if(t.id=='nsave'){S.name=($('nick').value||'').trim().slice(0,12);saveLocal();push(true);return renderRank()}
+  if(t.id=='chg')return toMenu();
+  if(!G)return;
+  if(t.id=='next'&&G.over)return newHand();
+  if(G.over||G.toAct!=0||!can(0))return;
+  if(t.id=='fold'){if(G.cur-G.P[0].bet<=0)return act(0,'check');return act(0,'fold')}
+  if(t.id=='call'){return act(0,G.cur-G.P[0].bet<=0?'check':'call')}
+  if(t.id=='raise'){return act(0,'raise',G.raiseTo)}
+  if(t.dataset.q){const p=G.P[0],r=raiseRange(0),pot=G.pot;let v=t.dataset.q=='min'?r.min:t.dataset.q=='all'?r.max:G.cur+Math.round((G.cur-p.bet+pot*(t.dataset.q=='half'?.5:1))/100)*100;v=Math.max(r.min,Math.min(r.max,v));G.raiseTo=v;panel()}
+});
+document.addEventListener('input',e=>{
+  if(!G||(e.target.id!='rs'&&e.target.id!='rn'))return;
+  const r=raiseRange(0),p=G.P[0];let v=Math.round((+e.target.value||0)/100)*100;
+  if(e.target.id=='rs'){G.raiseTo=Math.max(r.min,Math.min(r.max,v));const n=$('rn');if(n)n.value=G.raiseTo}
+  else{G.raiseTo=Math.max(r.min,Math.min(r.max,v||r.min));const s=$('rs');if(s)s.value=G.raiseTo}
+  const l=$('rl');if(l)l.textContent=fmt(G.raiseTo);
+});
+const LI=$('lang');LI.innerHTML=Object.keys(LN).map(k=>`<option value="${k}">${LN[k]}</option>`).join('');
+function applyLang(){
+  LI.value=L;document.documentElement.lang=L;document.title=t('ti')+' · '+t('rh');
+  $('ti').textContent=t('ti');$('nl').textContent=t('net');$('nt').textContent=t('notice');$('chg').textContent=t('chg');
+  $('rk').textContent=$('rank').hidden?t('rank'):t('back');
+  $('menu').innerHTML=['H','S'].map(k=>`<button class="mode" data-mode="${k=='H'?'holdem':'stud'}"><b>${t('t'+k)}</b><span>${t('d'+k)}</span><ul><li>${t('a'+k)}</li><li>${t('b'+k)}</li><li>${t('c'+k)}</li></ul></button>`).join('');
+  setSub();renderRank();if(G)render();
+}
+LI.onchange=()=>{L=LI.value;try{localStorage.setItem(LK,L)}catch(e){}applyLang()};
+applyLang();
+window.__G=()=>G;
+})();
+</script>
+
+</body></html>
